@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ResumeAI — Intelligent Candidate Intelligence Platform</title>
+  <meta name="description" content="Upload resumes and discover top candidates using hybrid semantic + keyword AI search powered by pgvector and Gemini." />
+  <link rel="stylesheet" href="app.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
+</head>
+<body>
+
+<!-- Animated background orbs -->
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+</div>
+
+<!-- Toast notifications -->
+<div id="toast-container"></div>
+
+<!-- SVG defs for score ring gradient -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:hsl(258,84%,68%)" />
+      <stop offset="100%" style="stop-color:hsl(215,84%,62%)" />
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-mark">🧠</div>
+    <div class="header-text">
+      <h1>ResumeAI</h1>
+      <p>Intelligent Candidate Intelligence Platform</p>
+    </div>
+    <div class="header-badge">
+      <div class="pulse-dot"></div>
+      System Online
+    </div>
+  </header>
+
+  <!-- Stats Strip -->
+  <div class="stat-strip" id="stat-strip">
+    <div class="stat-card">
+      <div class="stat-icon violet">📄</div>
+      <div>
+        <div class="stat-val" id="stat-indexed">—</div>
+        <div class="stat-lbl">Resumes Indexed</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon blue">🔮</div>
+      <div>
+        <div class="stat-val" id="stat-pending">—</div>
+        <div class="stat-lbl">Processing Queue</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green">⚡</div>
+      <div>
+        <div class="stat-val">pgvector</div>
+        <div class="stat-lbl">Vector Engine</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" role="tablist">
+    <button class="tab active" id="tab-search" role="tab" aria-selected="true" onclick="switchTab('search')">
+      🔍 Search Candidates
+    </button>
+    <button class="tab" id="tab-upload" role="tab" aria-selected="false" onclick="switchTab('upload')">
+      ⬆️ Upload Resume
+    </button>
+  </div>
+
+  <!-- ════════════════════════════════════
+       SEARCH PANEL
+  ════════════════════════════════════ -->
+  <div id="panel-search">
+    <div class="section-label">🔍 Hybrid Semantic Search</div>
+    <div class="card">
+      <div class="search-grid">
+        <div class="filter-group">
+          <label class="field-label" for="search-query">Search Query</label>
+          <div class="search-input-wrap">
+            <span class="search-icon-prefix">🔍</span>
+            <input type="text"
+              id="search-query"
+              placeholder="e.g.  Senior Java Developer with Spring Boot"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-search" onclick="runSearch()">
+          Search
+        </button>
+      </div>
+
+      <div class="filters-row">
+        <!-- Min Experience -->
+        <div class="filter-group">
+          <label class="field-label">
+            Min Experience &nbsp;
+            <span class="slider-val" id="exp-display">Any</span>
+          </label>
+          <input type="range" id="exp-slider" min="0" max="15" value="0"
+            oninput="updateExpLabel(this.value)" />
+        </div>
+
+        <!-- Skills Tags -->
+        <div class="filter-group" style="flex: 2; min-width: 200px;">
+          <label class="field-label">Required Skills <span style="color:var(--text-muted);font-weight:400">(press Enter to add)</span></label>
+          <div class="skills-tag-wrap" id="skills-tag-wrap" onclick="document.getElementById('skill-input').focus()">
+            <input type="text" id="skill-input" class="skill-input" placeholder="Java, Python, SQL..." />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div style="margin-top: 28px;">
+      <div class="results-header">
+        <div class="results-count" id="results-count"></div>
+        <select class="sort-select" id="sort-select" onchange="sortResults()" style="display:none">
+          <option value="hybrid">Sort: Hybrid Score</option>
+          <option value="semantic">Sort: Semantic Score</option>
+          <option value="lexical">Sort: Keyword Score</option>
+          <option value="exp">Sort: Experience</option>
+        </select>
+      </div>
+      <div class="results-grid" id="results-grid">
+        <!-- Initial empty state -->
+        <div class="state-container">
+          <div class="state-icon">🔍</div>
+          <div class="state-title">Ready to Search</div>
+          <div class="state-sub">Enter a job description or skill query above to find matching candidates using AI-powered hybrid search.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════
+       UPLOAD PANEL
+  ════════════════════════════════════ -->
+  <div id="panel-upload" style="display:none">
+    <div class="section-label">⬆️ Resume Ingestion Pipeline</div>
+    <div class="card">
+      <!-- Drag & drop zone -->
+      <div id="upload-zone"
+        ondragover="onDragOver(event)"
+        ondragleave="onDragLeave(event)"
+        ondrop="onDrop(event)"
+        onclick="document.getElementById('file-input').click()"
+      >
+        <div class="upload-icon">📂</div>
+        <h3>Drag & drop a PDF resume here</h3>
+        <p>or click to browse your files</p>
+        <div class="file-types">
+          <span class="file-type-tag">PDF</span>
+          <span class="file-type-tag">Max 10 MB</span>
+        </div>
+        <input type="file" id="file-input" accept=".pdf" onchange="onFileSelected(event)" />
+      </div>
+
+      <!-- File preview -->
+      <div class="file-preview" id="file-preview">
+        <span class="file-preview-icon">📄</span>
+        <span class="file-preview-name" id="file-name"></span>
+        <span class="file-preview-size" id="file-size"></span>
+        <span class="file-remove" title="Remove file" onclick="clearFile()">✕</span>
+      </div>
+
+      <!-- Candidate fields -->
+      <div class="upload-fields" style="margin-top: 24px;">
+        <div>
+          <label class="field-label" for="candidate-name">Candidate Name</label>
+          <input type="text" id="candidate-name" placeholder="e.g. Vigneshwar B" />
+        </div>
+        <div>
+          <label class="field-label" for="candidate-email">Email Address</label>
+          <input type="email" id="candidate-email" placeholder="e.g. vignesh@example.com" />
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="upload-progress-bar" id="upload-progress-bar">
+        <div class="upload-progress-fill" id="upload-progress-fill"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-upload" onclick="uploadResume()">
+          🚀 Upload &amp; Ingest
+        </button>
+        <button class="btn btn-secondary" onclick="clearFile()">
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <!-- Recent uploads -->
+    <div style="margin-top: 28px;">
+      <div class="section-label">📋 Recent Uploads</div>
+      <div id="recent-uploads">
+        <div class="state-container">
+          <div class="state-icon">📋</div>
+          <div class="state-title">No recent uploads</div>
+          <div class="state-sub">Uploaded resumes will appear here during this session.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrapper -->
+
+<script src="app.js"></script>
+</body>
+</html>
